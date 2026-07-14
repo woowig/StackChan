@@ -84,20 +84,17 @@ bool Bme688::begin()
         return false;
     }
 
-    // Gas heater: produces a raw gas resistance reading used for a rough,
-    // uncalibrated air quality heuristic (see hal_env.cpp). This is NOT
-    // Bosch's BSEC algorithm (closed-source, business-use-only license) -
-    // just the raw resistance value the sensor API exposes without it.
+    // Gas heater is disabled to save power: it's the dominant power draw of a
+    // BME688 measurement (300C hotplate), and only feeds the optional air
+    // quality heuristic. Temperature/pressure/humidity/WBGT are unaffected.
     struct bme68x_heatr_conf heatr_conf = {};
-    heatr_conf.enable                   = BME68X_ENABLE;
-    heatr_conf.heatr_temp               = 300;
-    heatr_conf.heatr_dur                = 100;
+    heatr_conf.enable                   = BME68X_DISABLE;
     rslt                                = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &_dev);
     if (rslt != BME68X_OK) {
         ESP_LOGE(TAG, "bme68x_set_heatr_conf failed: %d", rslt);
         return false;
     }
-    _heater_dur_us = (uint32_t)heatr_conf.heatr_dur * 1000;
+    _heater_dur_us = 0;
 
     _initialized = true;
     return true;
