@@ -11,10 +11,10 @@
 static const char* TAG = "SCD41";
 
 namespace {
-constexpr uint16_t CMD_STOP_PERIODIC_MEASUREMENT  = 0x3f86;
-constexpr uint16_t CMD_START_PERIODIC_MEASUREMENT = 0x21b1;
-constexpr uint16_t CMD_READ_MEASUREMENT           = 0xec05;
-constexpr uint16_t CMD_GET_DATA_READY_STATUS      = 0xe4b8;
+constexpr uint16_t CMD_STOP_PERIODIC_MEASUREMENT = 0x3f86;
+constexpr uint16_t CMD_MEASURE_SINGLE_SHOT       = 0x219d;
+constexpr uint16_t CMD_READ_MEASUREMENT          = 0xec05;
+constexpr uint16_t CMD_GET_DATA_READY_STATUS     = 0xe4b8;
 }  // namespace
 
 Scd41::Scd41(i2c_master_bus_handle_t i2c_bus_handle, uint8_t addr)
@@ -59,12 +59,18 @@ esp_err_t Scd41::readWords(uint8_t* data, size_t len)
 
 bool Scd41::begin()
 {
-    // Force a known state: stop periodic measurement if it happens to be
-    // running already (e.g. after a warm reboot), then start it fresh.
-    stopPeriodicMeasurement();
+    // Force a known idle state in case periodic measurement happens to be
+    // running already (e.g. after a warm reboot). Also serves as a presence
+    // check: sendCommand fails if nothing acks at the device address.
+    esp_err_t err = sendCommand(CMD_STOP_PERIODIC_MEASUREMENT);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    return err == ESP_OK;
+}
 
-    if (sendCommand(CMD_START_PERIODIC_MEASUREMENT) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start periodic measurement");
+bool Scd41::measureSingleShot()
+{
+    if (sendCommand(CMD_MEASURE_SINGLE_SHOT) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to trigger single shot measurement");
         return false;
     }
     return true;

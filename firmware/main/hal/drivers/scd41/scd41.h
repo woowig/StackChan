@@ -23,12 +23,19 @@ public:
     ~Scd41();
 
     /**
-     * @brief Put the sensor into periodic measurement mode (one sample every 5s)
+     * @brief Reset the sensor to idle state (stops periodic measurement if it
+     * happens to be running, e.g. after a warm reboot)
      *
-     * @return true if successful
+     * @return true if the device acked (i.e. is present on the bus)
      * @return false if failed
      */
     bool begin();
+
+    /**
+     * @brief Trigger a single low-power measurement. Takes up to 5s to
+     * complete; poll isDataReady() until it returns true.
+     */
+    bool measureSingleShot();
 
     /**
      * @brief Check whether a new measurement sample is available
