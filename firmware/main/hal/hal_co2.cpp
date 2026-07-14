@@ -1,8 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
 #include "hal.h"
 #include "board/hal_bridge.h"
 #include "drivers/scd41/scd41.h"

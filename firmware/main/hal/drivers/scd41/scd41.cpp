@@ -1,8 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
- *
- * SPDX-License-Identifier: MIT
- */
 #include "scd41.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
