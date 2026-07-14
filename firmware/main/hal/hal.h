@@ -74,6 +74,9 @@ struct EnvReading {
     // NOT a certified IAQ index. See hal_env.cpp for details.
     bool air_quality_valid    = false;
     float air_quality_percent = 0;
+    // Estimated indoor WBGT (heat stress index, Celsius). Approximated from
+    // temperature/humidity only (no globe thermometer). See hal_env.cpp.
+    float wbgt_celsius        = 0;
 };
 
 /**

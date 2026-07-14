@@ -24,10 +24,12 @@ Adds voice-assistant support for the [M5Stack ENV Pro Unit](https://docs.m5stack
 
 - `main/hal/drivers/bme688/BME68x_SensorAPI/` — Bosch's official BME68x sensor API (vendored, BSD-3-Clause), same approach as the BMI270 IMU driver
 - `main/hal/drivers/bme688/` — thin I2C wrapper around the sensor API, forced-mode (on-demand) temperature/pressure/humidity/gas-resistance readout
-- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, plus a rough "air quality score" (0-100%, higher is better) computed from humidity and the sensor's raw gas resistance against a self-adjusting baseline
-- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure, humidity and air quality
+- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, plus a rough "air quality score" (0-100%, higher is better) computed from humidity and the sensor's raw gas resistance against a self-adjusting baseline, and an estimated indoor WBGT heatstroke-risk index
+- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure, humidity, air quality, and heatstroke risk
 
 Note: this does **not** use Bosch's BSEC library for a calibrated IAQ index — BSEC is closed-source and its license restricts use to business users and prohibits redistributing the compiled library, which is incompatible with a public hobby-project repo. The air quality score is a simpler community-style heuristic instead: it starts from the first reading as a baseline and self-calibrates over subsequent queries (resets on reboot), so it's a relative/approximate indicator, not a certified measurement. The gas reading is also unreliable on the very first measurement after boot until the heater stabilizes (`gas_valid=false`), in which case `air_quality_percent` is omitted from the tool's response.
+
+The WBGT (Wet-Bulb Globe Temperature, 暑さ指数) estimate follows Japan's Ministry of the Environment indoor formula, `WBGT = 0.7 * wet-bulb temp + 0.3 * globe temp` ([wbgt.env.go.jp](https://www.wbgt.env.go.jp/)), with wet-bulb temperature approximated from temperature/humidity via Stull's (2011) empirical formula and globe temperature approximated by air temperature (no physical black-globe sensor). The reported `wbgt_risk_level` (caution/warning/severe warning/danger) uses the Ministry's official thresholds (25/28/31°C).
 
 ## Build
 

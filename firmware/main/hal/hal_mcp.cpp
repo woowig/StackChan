@@ -13,6 +13,16 @@ using namespace stackchan;
 
 static const std::string_view _tag = "HAL-MCP";
 
+// Risk category thresholds from Japan's Ministry of the Environment heatstroke
+// prevention guidance (https://www.wbgt.env.go.jp/).
+static const char* wbgtRiskLevel(float wbgt_celsius)
+{
+    if (wbgt_celsius >= 31.0f) return "danger";
+    if (wbgt_celsius >= 28.0f) return "severe warning";
+    if (wbgt_celsius >= 25.0f) return "warning";
+    return "caution";
+}
+
 void Hal::xiaozhi_mcp_init()
 {
     mclog::tagInfo(_tag, "init");
@@ -166,26 +176,25 @@ void Hal::xiaozhi_mcp_init()
     mclog::tagInfo(_tag, "add sensor.get_environment tool");
     mcp_server.AddTool(
         "self.sensor.get_environment",
-        "Get the current room temperature (Celsius), barometric pressure (hPa), humidity (%), and a rough air "
+        "Get the current room temperature (Celsius), barometric pressure (hPa), humidity (%), a rough air "
         "quality score (0-100%, higher is better; not a certified IAQ index, and becomes more accurate the more "
-        "often it's queried) from the environment sensor.",
+        "often it's queried), and an estimated indoor WBGT heatstroke-risk index (Celsius, with a risk level of "
+        "caution/warning/severe warning/danger per Japan's Ministry of the Environment scale) from the "
+        "environment sensor.",
         std::vector<Property>{}, [this](const PropertyList& properties) -> ReturnValue {
             auto reading = GetHAL().getEnvReading();
             if (!reading.valid) {
                 return std::string("Environment sensor is not ready yet, please try again shortly.");
             }
 
-            std::string result;
-            if (reading.air_quality_valid) {
-                result = fmt::format(
-                    R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}, "air_quality_percent": {:.0f}}})",
-                    reading.temperature_c, reading.pressure_hpa, reading.humidity_percent,
-                    reading.air_quality_percent);
-            } else {
-                result = fmt::format(
-                    R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}}})",
-                    reading.temperature_c, reading.pressure_hpa, reading.humidity_percent);
-            }
+            std::string aq_field = reading.air_quality_valid
+                                        ? fmt::format(R"(, "air_quality_percent": {:.0f})", reading.air_quality_percent)
+                                        : "";
+            auto result = fmt::format(
+                R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}{}, )"
+                R"("wbgt_celsius": {:.1f}, "wbgt_risk_level": "{}"}})",
+                reading.temperature_c, reading.pressure_hpa, reading.humidity_percent, aq_field,
+                reading.wbgt_celsius, wbgtRiskLevel(reading.wbgt_celsius));
             mclog::tagInfo(_tag, "get_environment: {}", result);
             return result;
         });

@@ -4,6 +4,7 @@
 #include <mooncake_log.h>
 #include <memory>
 #include <freertos/semphr.h>
+#include <cmath>
 
 static const std::string_view _tag = "HAL-ENV";
 
@@ -48,6 +49,30 @@ float computeAirQualityPercent(float humidity_percent, float gas_resistance_ohm,
     if (score < 0.0f) score = 0.0f;
     return score;
 }
+
+// Wet-bulb temperature approximation from dry-bulb temperature and relative
+// humidity (Stull, 2011, "Wet-Bulb Temperature from Relative Humidity and Air
+// Temperature", J. Appl. Meteor. Climatol. 50). Valid for RH 5-99% and
+// temperature -20 to 50C; mean absolute error < 0.3C over that range.
+float computeWetBulbCelsius(float temperature_c, float humidity_percent)
+{
+    return temperature_c * atanf(0.151977f * sqrtf(humidity_percent + 8.313659f)) +
+           atanf(temperature_c + humidity_percent) - atanf(humidity_percent - 1.676331f) +
+           0.00391838f * powf(humidity_percent, 1.5f) * atanf(0.023101f * humidity_percent) - 4.686035f;
+}
+
+// Indoor WBGT (heat stress index) per Japan's Ministry of the Environment
+// formula for indoor/no-solar-radiation conditions:
+// WBGT = 0.7 * wet-bulb temperature + 0.3 * globe temperature. Without a
+// physical black globe thermometer, globe temperature is approximated by
+// air temperature, which is standard practice indoors away from direct heat
+// sources but will read low near strong radiant heat (e.g. direct sun,
+// stoves).
+float computeIndoorWbgtCelsius(float temperature_c, float humidity_percent)
+{
+    float wet_bulb_c = computeWetBulbCelsius(temperature_c, humidity_percent);
+    return 0.7f * wet_bulb_c + 0.3f * temperature_c;
+}
 }  // namespace
 
 static float _gas_baseline_ohm = 0;
@@ -84,6 +109,7 @@ EnvReading Hal::getEnvReading()
         result.temperature_c    = data.temperature_c;
         result.pressure_hpa     = data.pressure_hpa;
         result.humidity_percent = data.humidity_percent;
+        result.wbgt_celsius     = computeIndoorWbgtCelsius(data.temperature_c, data.humidity_percent);
 
         if (data.gas_valid) {
             if (!_gas_baseline_set || data.gas_resistance_ohm > _gas_baseline_ohm) {
@@ -98,9 +124,9 @@ EnvReading Hal::getEnvReading()
                                                                     _gas_baseline_ohm);
         }
 
-        mclog::tagInfo(_tag, "ENV: {:.1f}hPa, {:.1f}C, {:.1f}%RH, gas={:.0f}ohm (valid={}), aq={:.0f}%",
+        mclog::tagInfo(_tag, "ENV: {:.1f}hPa, {:.1f}C, {:.1f}%RH, gas={:.0f}ohm (valid={}), aq={:.0f}%, wbgt={:.1f}C",
                        data.pressure_hpa, data.temperature_c, data.humidity_percent, data.gas_resistance_ohm,
-                       data.gas_valid, result.air_quality_percent);
+                       data.gas_valid, result.air_quality_percent, result.wbgt_celsius);
     } else {
         mclog::tagWarn(_tag, "measurement failed");
     }
