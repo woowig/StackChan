@@ -66,10 +66,14 @@ struct Co2Reading {
  *
  */
 struct EnvReading {
-    bool valid              = false;
-    float temperature_c     = 0;
-    float pressure_hpa      = 0;
-    float humidity_percent  = 0;
+    bool valid                = false;
+    float temperature_c       = 0;
+    float pressure_hpa        = 0;
+    float humidity_percent    = 0;
+    // Rough, uncalibrated air quality heuristic (0-100, higher = better),
+    // NOT a certified IAQ index. See hal_env.cpp for details.
+    bool air_quality_valid    = false;
+    float air_quality_percent = 0;
 };
 
 /**

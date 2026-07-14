@@ -164,19 +164,29 @@ void Hal::xiaozhi_mcp_init()
                        });
 
     mclog::tagInfo(_tag, "add sensor.get_environment tool");
-    mcp_server.AddTool("self.sensor.get_environment",
-                       "Get the current room temperature (Celsius), barometric pressure (hPa) and humidity (%) "
-                       "from the environment sensor.",
-                       std::vector<Property>{}, [this](const PropertyList& properties) -> ReturnValue {
-                           auto reading = GetHAL().getEnvReading();
-                           if (!reading.valid) {
-                               return std::string("Environment sensor is not ready yet, please try again shortly.");
-                           }
+    mcp_server.AddTool(
+        "self.sensor.get_environment",
+        "Get the current room temperature (Celsius), barometric pressure (hPa), humidity (%), and a rough air "
+        "quality score (0-100%, higher is better; not a certified IAQ index, and becomes more accurate the more "
+        "often it's queried) from the environment sensor.",
+        std::vector<Property>{}, [this](const PropertyList& properties) -> ReturnValue {
+            auto reading = GetHAL().getEnvReading();
+            if (!reading.valid) {
+                return std::string("Environment sensor is not ready yet, please try again shortly.");
+            }
 
-                           auto result = fmt::format(
-                               R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}}})",
-                               reading.temperature_c, reading.pressure_hpa, reading.humidity_percent);
-                           mclog::tagInfo(_tag, "get_environment: {}", result);
-                           return result;
-                       });
+            std::string result;
+            if (reading.air_quality_valid) {
+                result = fmt::format(
+                    R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}, "air_quality_percent": {:.0f}}})",
+                    reading.temperature_c, reading.pressure_hpa, reading.humidity_percent,
+                    reading.air_quality_percent);
+            } else {
+                result = fmt::format(
+                    R"({{"temperature_c": {:.1f}, "pressure_hpa": {:.1f}, "humidity_percent": {:.1f}}})",
+                    reading.temperature_c, reading.pressure_hpa, reading.humidity_percent);
+            }
+            mclog::tagInfo(_tag, "get_environment: {}", result);
+            return result;
+        });
 }

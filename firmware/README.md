@@ -20,12 +20,14 @@ Note: this repurposes GPIO2, which upstream also wires up (unused on this hardwa
 
 ### Environment sensor support (M5Stack ENV Pro Unit / Bosch BME688)
 
-Adds voice-assistant support for the [M5Stack ENV Pro Unit](https://docs.m5stack.com/en/unit/ENV%20Pro%20Unit), sharing the same Grove **PORT.A** I2C bus as the CO2L unit above (via a hub):
+Adds voice-assistant support for the [M5Stack ENV Pro Unit](https://docs.m5stack.com/en/unit/ENV%20Pro%20Unit), on Grove **PORT.A**:
 
 - `main/hal/drivers/bme688/BME68x_SensorAPI/` — Bosch's official BME68x sensor API (vendored, BSD-3-Clause), same approach as the BMI270 IMU driver
-- `main/hal/drivers/bme688/` — thin I2C wrapper around the sensor API, forced-mode (on-demand) temperature/pressure/humidity readout; the gas/VOC heater is not configured, since that requires Bosch's closed-source BSEC library
-- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, same on-demand pattern as the CO2 sensor
-- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure and humidity
+- `main/hal/drivers/bme688/` — thin I2C wrapper around the sensor API, forced-mode (on-demand) temperature/pressure/humidity/gas-resistance readout
+- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, plus a rough "air quality score" (0-100%, higher is better) computed from humidity and the sensor's raw gas resistance against a self-adjusting baseline
+- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure, humidity and air quality
+
+Note: this does **not** use Bosch's BSEC library for a calibrated IAQ index — BSEC is closed-source and its license restricts use to business users and prohibits redistributing the compiled library, which is incompatible with a public hobby-project repo. The air quality score is a simpler community-style heuristic instead: it starts from the first reading as a baseline and self-calibrates over subsequent queries (resets on reboot), so it's a relative/approximate indicator, not a certified measurement. The gas reading is also unreliable on the very first measurement after boot until the heater stabilizes (`gas_valid=false`), in which case `air_quality_percent` is omitted from the tool's response.
 
 ## Build
 

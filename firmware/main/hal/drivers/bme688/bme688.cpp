@@ -84,14 +84,20 @@ bool Bme688::begin()
         return false;
     }
 
-    // Gas/VOC heater is not used for plain temperature/pressure/humidity readings.
+    // Gas heater: produces a raw gas resistance reading used for a rough,
+    // uncalibrated air quality heuristic (see hal_env.cpp). This is NOT
+    // Bosch's BSEC algorithm (closed-source, business-use-only license) -
+    // just the raw resistance value the sensor API exposes without it.
     struct bme68x_heatr_conf heatr_conf = {};
-    heatr_conf.enable                   = BME68X_DISABLE;
+    heatr_conf.enable                   = BME68X_ENABLE;
+    heatr_conf.heatr_temp               = 300;
+    heatr_conf.heatr_dur                = 100;
     rslt                                = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &_dev);
     if (rslt != BME68X_OK) {
         ESP_LOGE(TAG, "bme68x_set_heatr_conf failed: %d", rslt);
         return false;
     }
+    _heater_dur_us = (uint32_t)heatr_conf.heatr_dur * 1000;
 
     _initialized = true;
     return true;
@@ -109,7 +115,7 @@ bool Bme688::readMeasurement(Bme688Data& out)
         return false;
     }
 
-    uint32_t del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &_conf, &_dev);
+    uint32_t del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &_conf, &_dev) + _heater_dur_us;
     _dev.delay_us(del_period, _dev.intf_ptr);
 
     struct bme68x_data data;
@@ -120,8 +126,10 @@ bool Bme688::readMeasurement(Bme688Data& out)
         return false;
     }
 
-    out.temperature_c    = data.temperature;
-    out.pressure_hpa     = data.pressure / 100.0f;
-    out.humidity_percent = data.humidity;
+    out.temperature_c      = data.temperature;
+    out.pressure_hpa       = data.pressure / 100.0f;
+    out.humidity_percent   = data.humidity;
+    out.gas_resistance_ohm = data.gas_resistance;
+    out.gas_valid          = (data.status & BME68X_GASM_VALID_MSK) && (data.status & BME68X_HEAT_STAB_MSK);
     return true;
 }

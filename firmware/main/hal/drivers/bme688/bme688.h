@@ -9,6 +9,8 @@ struct Bme688Data {
     float temperature_c;
     float pressure_hpa;
     float humidity_percent;
+    float gas_resistance_ohm;
+    bool gas_valid;  // true if the gas heater reached a stable temperature this cycle
 };
 
 class Bme688 {
@@ -20,7 +22,8 @@ public:
 
     /**
      * @brief Initialize the device and configure temperature/pressure/humidity
-     * oversampling. Gas/VOC heater is left disabled.
+     * oversampling, plus the gas heater (300C for 100ms) used for the raw gas
+     * resistance reading.
      *
      * @return true if successful
      * @return false if failed
@@ -40,6 +43,7 @@ private:
     i2c_master_dev_handle_t _i2c_dev;
     struct bme68x_dev _dev;
     struct bme68x_conf _conf;
+    uint32_t _heater_dur_us;
     uint8_t _addr;
     bool _initialized;
 
