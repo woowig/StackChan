@@ -54,6 +54,17 @@ enum class ImuMotionEvent {
  * @brief
  *
  */
+struct Co2Reading {
+    bool valid              = false;
+    uint16_t co2_ppm        = 0;
+    float temperature_c     = 0;
+    float humidity_percent  = 0;
+};
+
+/**
+ * @brief
+ *
+ */
 enum class AppConfigEvent {
     None = 0,
     AppConnected,
@@ -256,6 +267,9 @@ public:
     /* ----------------------------------- IMU ---------------------------------- */
     uitk::Signal<ImuMotionEvent> onImuMotionEvent;
 
+    /* ----------------------------------- CO2 ---------------------------------- */
+    Co2Reading getCo2Reading();
+
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
     void syncSystemTimeToRtc();
@@ -312,6 +326,7 @@ private:
     void head_touch_init();
     void io_expander_init();
     void imu_init();
+    void co2_init();
     void rtc_init();
 };
 

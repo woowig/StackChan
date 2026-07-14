@@ -146,4 +146,20 @@ void Hal::xiaozhi_mcp_init()
                            tools::stop_reminder(id);
                            return true;
                        });
+
+    mclog::tagInfo(_tag, "add sensor.get_co2 tool");
+    mcp_server.AddTool("self.sensor.get_co2",
+                       "Get the current CO2 concentration (ppm), temperature (Celsius) and humidity (%) from the "
+                       "room's CO2 sensor.",
+                       std::vector<Property>{}, [this](const PropertyList& properties) -> ReturnValue {
+                           auto reading = GetHAL().getCo2Reading();
+                           if (!reading.valid) {
+                               return std::string("CO2 sensor is not ready yet, please try again shortly.");
+                           }
+
+                           auto result = fmt::format(R"({{"co2_ppm": {}, "temperature_c": {:.1f}, "humidity_percent": {:.1f}}})",
+                                                     reading.co2_ppm, reading.temperature_c, reading.humidity_percent);
+                           mclog::tagInfo(_tag, "get_co2: {}", result);
+                           return result;
+                       });
 }
