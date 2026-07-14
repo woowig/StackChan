@@ -1,8 +1,28 @@
 diff --git a/main/application.cc b/main/application.cc
-index d69d43d..3b6f07e 100644
+index d69d43d..c39ac4e 100644
 --- a/main/application.cc
 +++ b/main/application.cc
-@@ -610,33 +610,36 @@ void Application::InitializeProtocol() {
+@@ -433,13 +433,14 @@ void Application::CheckNewVersion() {
+         retry_delay = 10; // Reset retry delay
+ 
+         if (ota_->HasNewVersion()) {
+-            if (UpgradeFirmware(ota_->GetFirmwareUrl(), ota_->GetFirmwareVersion())) {
+-                return; // This line will never be reached after reboot
+-            }
+-            // If upgrade failed, continue to normal operation
++            // Automatic OTA upgrade is disabled for StackChan: the configured
++            // OTA_URL points at the upstream xiaozhi server, which does not
++            // serve StackChan-compatible firmware images.
++            ESP_LOGW(TAG, "New firmware version available (%s) but automatic OTA upgrade is disabled",
++                     ota_->GetFirmwareVersion().c_str());
+         }
+ 
+-        // No new version, mark the current version as valid
++        // Mark the current version as valid regardless of upgrade availability
+         ota_->MarkCurrentVersionValid();
+         if (!ota_->HasActivationCode() && !ota_->HasActivationChallenge()) {
+             // Exit the loop if done checking new version
+@@ -610,33 +611,36 @@ void Application::InitializeProtocol() {
  }
  
  void Application::ShowActivationCode(const std::string& code, const std::string& message) {
