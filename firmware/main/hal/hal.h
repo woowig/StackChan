@@ -65,6 +65,17 @@ struct Co2Reading {
  * @brief
  *
  */
+struct EnvReading {
+    bool valid              = false;
+    float temperature_c     = 0;
+    float pressure_hpa      = 0;
+    float humidity_percent  = 0;
+};
+
+/**
+ * @brief
+ *
+ */
 enum class AppConfigEvent {
     None = 0,
     AppConnected,
@@ -270,6 +281,9 @@ public:
     /* ----------------------------------- CO2 ---------------------------------- */
     Co2Reading getCo2Reading();
 
+    /* ------------------------------- Environment ------------------------------ */
+    EnvReading getEnvReading();
+
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();
     void syncSystemTimeToRtc();
@@ -327,6 +341,7 @@ private:
     void io_expander_init();
     void imu_init();
     void co2_init();
+    void env_init();
     void rtc_init();
 };
 

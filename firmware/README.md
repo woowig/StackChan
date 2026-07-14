@@ -18,6 +18,15 @@ Adds voice-assistant support for the [M5Stack CO2L unit](https://docs.m5stack.co
 
 Note: this repurposes GPIO2, which upstream also wires up (unused on this hardware) as a laser-pointer output in `Hal::setLaserEnabled()` (`main/hal/hal_espnow.cpp`). The two features cannot be used at the same time.
 
+### Environment sensor support (M5Stack ENV Pro Unit / Bosch BME688)
+
+Adds voice-assistant support for the [M5Stack ENV Pro Unit](https://docs.m5stack.com/en/unit/ENV%20Pro%20Unit), sharing the same Grove **PORT.A** I2C bus as the CO2L unit above (via a hub):
+
+- `main/hal/drivers/bme688/BME68x_SensorAPI/` — Bosch's official BME68x sensor API (vendored, BSD-3-Clause), same approach as the BMI270 IMU driver
+- `main/hal/drivers/bme688/` — thin I2C wrapper around the sensor API, forced-mode (on-demand) temperature/pressure/humidity readout; the gas/VOC heater is not configured, since that requires Bosch's closed-source BSEC library
+- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, same on-demand pattern as the CO2 sensor
+- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure and humidity
+
 ## Build
 
 ### Fetch Dependencies
