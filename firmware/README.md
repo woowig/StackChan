@@ -12,7 +12,7 @@ This fork tracks [m5stack/StackChan](https://github.com/m5stack/StackChan) (`ups
 Adds voice-assistant support for the [M5Stack CO2L unit](https://docs.m5stack.com/en/unit/CO2L), wired to Grove **PORT.A** (SDA=G2, SCL=G1):
 
 - `main/hal/drivers/scd41/` — minimal SCD41 I2C driver (low-power single-shot measurement, CRC8-verified)
-- `main/hal/hal_co2.cpp` — HAL wrapper; a measurement is triggered on demand (single shot, ~5s) rather than polled continuously, to save power on battery
+- `main/hal/hal_co2.cpp` — HAL wrapper; a measurement is triggered on demand (single shot, ~5s) rather than polled continuously, to save power on battery. It also runs a background task that takes a reading every 10 minutes and, if CO2 is at or above 1000ppm (Japan's Building Sanitation Law ventilation guidance), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after the level drops back down
 - `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_co2` MCP tool so the assistant can answer questions about CO2 concentration, temperature and humidity
 - `main/hal/board/stackchan.cc` — adds a second, external I2C bus for Grove PORT.A, separate from the internal I2C bus used for the PMIC/touch/etc.
 

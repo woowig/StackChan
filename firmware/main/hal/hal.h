@@ -287,6 +287,9 @@ public:
 
     /* ----------------------------------- CO2 ---------------------------------- */
     Co2Reading getCo2Reading();
+    // Fires when a periodic background check finds CO2 at/above the
+    // ventilation threshold. Re-arms once the reading drops back below it.
+    uitk::Signal<uint16_t> onCo2VentilationAlert;
 
     /* ------------------------------- Environment ------------------------------ */
     EnvReading getEnvReading();

@@ -198,6 +198,19 @@ void Hal::startXiaozhi()
         hal_bridge::app_play_sound(OGG_NEW_NOTIFICATION);
     });
 
+    // Setup CO2 ventilation alert handler
+    onCo2VentilationAlert.clear();
+    onCo2VentilationAlert.connect([](uint16_t ppm) {
+        std::string msg = "High CO2: " + std::to_string(ppm) + " ppm, consider ventilating";
+        mclog::tagInfo(_tag, "co2 ventilation alert: {}", msg);
+        {
+            LvglLockGuard lock;
+            auto& avatar = GetStackChan().avatar();
+            avatar.addDecorator(std::make_unique<view::ReminderView>(lv_screen_active(), msg));
+        }
+        hal_bridge::app_play_sound(OGG_NEW_NOTIFICATION);
+    });
+
     // Start stackchan update task
     xTaskCreatePinnedToCore(_stackchan_update_task, "stackchan", 4096, NULL, 3, NULL, 1);
 

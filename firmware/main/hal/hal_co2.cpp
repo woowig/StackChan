@@ -4,14 +4,46 @@
 #include <mooncake_log.h>
 #include <memory>
 #include <freertos/semphr.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 static const std::string_view _tag = "HAL-CO2";
 
 static constexpr int kSingleShotTimeoutMs = 5500;
 static constexpr int kSingleShotPollMs    = 100;
 
+// Ventilation guidance threshold (1000ppm, per Japan's Building Sanitation
+// Law standard for indoor CO2). The background monitor alerts once per
+// crossing and re-arms only after the reading drops back below it, so it
+// doesn't repeat every cycle while the room stays stuffy.
+static constexpr uint16_t kVentilationThresholdPpm = 1000;
+static constexpr uint32_t kMonitorIntervalMs        = 10 * 60 * 1000;
+
 static std::unique_ptr<Scd41> _scd41;
 static SemaphoreHandle_t _co2_mutex = nullptr;
+
+static void _co2_monitor_task(void* param)
+{
+    bool alerted = false;
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(kMonitorIntervalMs));
+
+        auto reading = GetHAL().getCo2Reading();
+        if (!reading.valid) {
+            continue;
+        }
+
+        if (reading.co2_ppm >= kVentilationThresholdPpm) {
+            if (!alerted) {
+                alerted = true;
+                GetHAL().onCo2VentilationAlert.emit(reading.co2_ppm);
+            }
+        } else {
+            alerted = false;
+        }
+    }
+}
 
 void Hal::co2_init()
 {
@@ -27,6 +59,8 @@ void Hal::co2_init()
         return;
     }
     mclog::tagInfo(_tag, "SCD41 init ok");
+
+    xTaskCreatePinnedToCore(_co2_monitor_task, "co2_monitor", 4096, NULL, 2, NULL, 1);
 }
 
 Co2Reading Hal::getCo2Reading()
