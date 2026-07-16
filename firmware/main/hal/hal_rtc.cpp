@@ -125,3 +125,15 @@ std::string Hal::getTimezone()
     Settings settings("system", false);
     return settings.GetString("tz", "GMT0");
 }
+
+bool Hal::isQuietHours()
+{
+    constexpr int kQuietStartHour = 23;
+    constexpr int kQuietEndHour   = 7;
+
+    time_t now = time(nullptr);
+    struct tm tm_now;
+    localtime_r(&now, &tm_now);
+
+    return tm_now.tm_hour >= kQuietStartHour || tm_now.tm_hour < kQuietEndHour;
+}

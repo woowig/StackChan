@@ -35,7 +35,7 @@ static void _co2_monitor_task(void* param)
         }
 
         if (reading.co2_ppm >= kVentilationThresholdPpm) {
-            if (!alerted) {
+            if (!alerted && !GetHAL().isQuietHours()) {
                 alerted = true;
                 GetHAL().onCo2VentilationAlert.emit(reading.co2_ppm);
             }

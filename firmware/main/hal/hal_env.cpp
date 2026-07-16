@@ -99,7 +99,7 @@ static void _env_monitor_task(void* param)
         }
 
         if (reading.wbgt_celsius >= kWbgtAlertThresholdCelsius) {
-            if (!alerted) {
+            if (!alerted && !GetHAL().isQuietHours()) {
                 alerted = true;
                 GetHAL().onWbgtAlert.emit(reading.wbgt_celsius);
             }

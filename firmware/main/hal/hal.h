@@ -302,6 +302,9 @@ public:
     void syncSystemTimeToRtc();
     void setTimezone(std::string_view tz);
     std::string getTimezone();
+    // True during the overnight quiet-hours window (23:00-07:00 local time),
+    // used to suppress background sensor alerts so they don't wake anyone up.
+    bool isQuietHours();
 
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;

@@ -12,7 +12,7 @@ This fork tracks [m5stack/StackChan](https://github.com/m5stack/StackChan) (`ups
 Adds voice-assistant support for the [M5Stack CO2L unit](https://docs.m5stack.com/en/unit/CO2L), wired to Grove **PORT.A** (SDA=G2, SCL=G1):
 
 - `main/hal/drivers/scd41/` — minimal SCD41 I2C driver (low-power single-shot measurement, CRC8-verified)
-- `main/hal/hal_co2.cpp` — HAL wrapper; a measurement is triggered on demand (single shot, ~5s) rather than polled continuously, to save power on battery. It also runs a background task that takes a reading every 10 minutes and, if CO2 is at or above 1000ppm (Japan's Building Sanitation Law ventilation guidance), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after the level drops back down
+- `main/hal/hal_co2.cpp` — HAL wrapper; a measurement is triggered on demand (single shot, ~5s) rather than polled continuously, to save power on battery. It also runs a background task that takes a reading every 10 minutes and, if CO2 is at or above 1000ppm (Japan's Building Sanitation Law ventilation guidance), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after the level drops back down. Alerts are suppressed during quiet hours (23:00-07:00 local time, see `Hal::isQuietHours()` in `main/hal/hal_rtc.cpp`)
 - `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_co2` MCP tool so the assistant can answer questions about CO2 concentration, temperature and humidity
 - `main/hal/board/stackchan.cc` — adds a second, external I2C bus for Grove PORT.A, separate from the internal I2C bus used for the PMIC/touch/etc.
 
@@ -33,7 +33,7 @@ The gas heater (and with it, the air quality score) is currently **disabled** to
 
 The WBGT (Wet-Bulb Globe Temperature, 暑さ指数) estimate follows Japan's Ministry of the Environment indoor formula, `WBGT = 0.7 * wet-bulb temp + 0.3 * globe temp` ([wbgt.env.go.jp](https://www.wbgt.env.go.jp/)), with wet-bulb temperature approximated from temperature/humidity via Stull's (2011) empirical formula and globe temperature approximated by air temperature (no physical black-globe sensor). The reported `wbgt_risk_level` (caution/warning/severe warning/danger) uses the Ministry's official thresholds (25/28/31°C).
 
-`hal_env.cpp` also runs a background task that takes a reading every 10 minutes and, if WBGT is at or above 28°C (the Ministry's "severe warning" level), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after it drops back down, same as the CO2 ventilation alert below.
+`hal_env.cpp` also runs a background task that takes a reading every 10 minutes and, if WBGT is at or above 28°C (the Ministry's "severe warning" level), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after it drops back down, same as the CO2 ventilation alert above (and likewise suppressed during quiet hours).
 
 ## Build
 
