@@ -293,6 +293,9 @@ public:
 
     /* ------------------------------- Environment ------------------------------ */
     EnvReading getEnvReading();
+    // Fires when a periodic background check finds WBGT at/above the
+    // heat-stress alert threshold. Re-arms once the reading drops back below it.
+    uitk::Signal<float> onWbgtAlert;
 
     /* ---------------------------------- Time ---------------------------------- */
     void syncRtcTimeToSystem();

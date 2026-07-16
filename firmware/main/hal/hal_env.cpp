@@ -4,6 +4,8 @@
 #include <mooncake_log.h>
 #include <memory>
 #include <freertos/semphr.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <cmath>
 
 static const std::string_view _tag = "HAL-ENV";
@@ -78,6 +80,35 @@ float computeIndoorWbgtCelsius(float temperature_c, float humidity_percent)
 static float _gas_baseline_ohm = 0;
 static bool _gas_baseline_set  = false;
 
+// Heat-stress alert threshold: Japan's Ministry of the Environment "severe
+// warning" (厳重警戒) WBGT level. The background monitor alerts once per
+// crossing and re-arms only after the reading drops back below it.
+static constexpr float kWbgtAlertThresholdCelsius = 28.0f;
+static constexpr uint32_t kMonitorIntervalMs       = 10 * 60 * 1000;
+
+static void _env_monitor_task(void* param)
+{
+    bool alerted = false;
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(kMonitorIntervalMs));
+
+        auto reading = GetHAL().getEnvReading();
+        if (!reading.valid) {
+            continue;
+        }
+
+        if (reading.wbgt_celsius >= kWbgtAlertThresholdCelsius) {
+            if (!alerted) {
+                alerted = true;
+                GetHAL().onWbgtAlert.emit(reading.wbgt_celsius);
+            }
+        } else {
+            alerted = false;
+        }
+    }
+}
+
 void Hal::env_init()
 {
     mclog::tagInfo(_tag, "init");
@@ -92,6 +123,8 @@ void Hal::env_init()
         return;
     }
     mclog::tagInfo(_tag, "BME688 init ok");
+
+    xTaskCreatePinnedToCore(_env_monitor_task, "env_monitor", 4096, NULL, 2, NULL, 1);
 }
 
 EnvReading Hal::getEnvReading()

@@ -136,6 +136,7 @@ void Hal::updateHeapStatusLog()
 #include <stackchan/stackchan.h>
 #include <apps/common/common.h>
 #include <assets/assets.h>
+#include <cstdio>
 
 void Hal::xiaozhi_board_init()
 {
@@ -203,6 +204,21 @@ void Hal::startXiaozhi()
     onCo2VentilationAlert.connect([](uint16_t ppm) {
         std::string msg = "High CO2: " + std::to_string(ppm) + " ppm, consider ventilating";
         mclog::tagInfo(_tag, "co2 ventilation alert: {}", msg);
+        {
+            LvglLockGuard lock;
+            auto& avatar = GetStackChan().avatar();
+            avatar.addDecorator(std::make_unique<view::ReminderView>(lv_screen_active(), msg));
+        }
+        hal_bridge::app_play_sound(OGG_NEW_NOTIFICATION);
+    });
+
+    // Setup WBGT heat-stress alert handler
+    onWbgtAlert.clear();
+    onWbgtAlert.connect([](float wbgt_celsius) {
+        char wbgt_buf[16];
+        snprintf(wbgt_buf, sizeof(wbgt_buf), "%.1f", wbgt_celsius);
+        std::string msg = std::string("High heat stress: WBGT ") + wbgt_buf + "C, stay hydrated";
+        mclog::tagInfo(_tag, "wbgt alert: {}", msg);
         {
             LvglLockGuard lock;
             auto& avatar = GetStackChan().avatar();

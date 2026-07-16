@@ -33,6 +33,8 @@ The gas heater (and with it, the air quality score) is currently **disabled** to
 
 The WBGT (Wet-Bulb Globe Temperature, 暑さ指数) estimate follows Japan's Ministry of the Environment indoor formula, `WBGT = 0.7 * wet-bulb temp + 0.3 * globe temp` ([wbgt.env.go.jp](https://www.wbgt.env.go.jp/)), with wet-bulb temperature approximated from temperature/humidity via Stull's (2011) empirical formula and globe temperature approximated by air temperature (no physical black-globe sensor). The reported `wbgt_risk_level` (caution/warning/severe warning/danger) uses the Ministry's official thresholds (25/28/31°C).
 
+`hal_env.cpp` also runs a background task that takes a reading every 10 minutes and, if WBGT is at or above 28°C (the Ministry's "severe warning" level), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after it drops back down, same as the CO2 ventilation alert below.
+
 ## Build
 
 ### Fetch Dependencies
