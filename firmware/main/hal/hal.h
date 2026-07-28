@@ -306,6 +306,14 @@ public:
     // used to suppress background sensor alerts so they don't wake anyone up.
     bool isQuietHours();
 
+    /* ----------------------------------- TTS ----------------------------------- */
+    // Local, offline speech synthesis (AquesTalk ESP32, evaluation build --
+    // see firmware/components/aquestalk/THIRD_PARTY_README.txt). Speaks an
+    // AquesTalk phonetic symbol string (romaji-based, not free-form Japanese
+    // text) through the avatar's own speaker. Returns false if the library
+    // failed to initialize or the symbol string was rejected.
+    bool speakSymbols(std::string_view koe);
+
     /* --------------------------------- EspNow --------------------------------- */
     uitk::Signal<const std::vector<uint8_t>&> onEspNowData;
     void startEspNow(int channel);

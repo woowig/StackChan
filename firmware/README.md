@@ -42,7 +42,29 @@ Adds automatic backlight dimming to the AI-agent avatar screen, to save power an
 - `main/hal/board/stackchan_display.cc` (`StackChanAvatarDisplay::UpdateStatusBar`/`SetStatus`) — after 10 seconds of being idle (not listening or speaking), the backlight drops to 10% brightness; during quiet hours (23:00-07:00 local time, the same window `Hal::isQuietHours()` uses for the CO2/WBGT alerts above) it goes fully off instead. Brightness is restored automatically the moment a conversation starts again (wake word, tap on the avatar, etc).
 - `main/hal/board/stackchan.cc` (`CustomBacklight::SetBrightnessImpl`) — fixes a pre-existing bug where every brightness change drove the PMIC over I2C with dozens of redundant writes spread across up to ~450ms (the base `Backlight` class's software fade steps its internal brightness by 1 every 5ms, but this board's `SetBrightnessImpl` ignored that stepped value and re-wrote the final target on every tick instead of once). Since that internal I2C bus is shared with the audio codec, touch controller and IMU, the redundant writes could stall audio playback and avatar animation whenever brightness changed during a live conversation. Brightness is now applied in a single write and the fade timer stopped immediately — matching the PMIC hardware anyway, which has no native fade, just a coarse 8-level register.
 
+### Spoken CO2/WBGT alerts (AquesTalk ESP32)
+
+Adds actual speech to the CO2 ventilation and WBGT heat-stress background alerts above (previously just an on-screen bubble + notification ding):
+
+- `main/hal/hal_tts.cpp` — thin wrapper around AquesTalk ESP32's rule-synthesis engine (`Hal::speakSymbols()`): feeds an AquesTalk phonetic symbol string through `CAqTkPicoF_SetKoe`/`SyntheFrame`, upsamples the 8kHz output 3x (`AqResample_Conv`) to match this board's 24kHz audio pipeline, and writes it straight to the avatar's own speaker.
+- `main/hal/board/hal_bridge.h`/`stackchan.cc` (`board_output_pcm`) — writes a raw PCM buffer directly to `Board::GetAudioCodec()`, bypassing `AudioService`'s decode/playback queue (which only speaks pre-encoded OGG assets). Not synchronized with the AI's own voice output, so callers must check `hal_bridge::is_xiaozhi_idle()` first — the alert handlers in `hal.cpp` skip the spoken part (keeping the visual+ding) if a conversation is in progress, rather than risk corrupting either audio stream.
+- `main/hal/hal.cpp` (`onCo2VentilationAlert`/`onWbgtAlert` handlers) — speaks e.g. "二酸化炭素濃度は812ピーピーエムです。換気してください。" using AquesTalk's `<NUMK VAL=... COUNTER=...>` digit-reading tag, which renders arbitrary numbers with correct Japanese sound changes (rendaku, gemination, etc.) entirely offline and without needing AquesTalk's ~2MB kanji dictionary — the fixed part of each phrase is a hand-written phonetic template, only the number is generated at runtime.
+
+Note: AquesTalk ESP32 is closed-source and its evaluation build has a fixed limitation (the な/ま row is pronounced "ヌ") until a paid license key is set — same category of restriction as the BSEC note above, so **the SDK itself is not committed to this repo** (`firmware/components/` is already gitignored). See "AquesTalk ESP32 SDK" under Build below for how to obtain and place it before building this fork.
+
 ## Build
+
+### AquesTalk ESP32 SDK (required for spoken alerts)
+
+The CO2/WBGT spoken-alert feature above links against [AquesTalk ESP32](https://www.a-quest.com/products/aquestalk_esp32.html), a proprietary speech-synthesis SDK. It isn't part of this repo (see the license note above), so it has to be placed manually:
+
+1. Download the evaluation SDK zip (or a licensed build, once purchased) from the AquesTalk ESP32 product page.
+2. Copy these two files out of the zip into `firmware/components/aquestalk/`:
+   - `src/aquestalk.h` → `firmware/components/aquestalk/include/aquestalk.h`
+   - `src/esp32s3/libaquestalk_s.a` → `firmware/components/aquestalk/lib/esp32s3/libaquestalk_s.a`
+3. `firmware/components/aquestalk/CMakeLists.txt` (checked into this repo) wraps the prebuilt library as an ESP-IDF component; nothing else to configure.
+
+The kanji dictionary (`aq_dic/aqdic_m.bin`) is **not** used or needed — see the note above about the `<NUMK>` tag avoiding it. If it's ever wired in later, be aware it's ~2MB and this board's 16MB flash only has ~60KB of headroom left after the existing partitions (nvs/ota_0/ota_1/assets/coredump), so it wouldn't fit without shrinking something (`ota_1`, most likely, since automatic OTA is disabled — see above).
 
 ### Fetch Dependencies
 

@@ -9,6 +9,7 @@
 #include <lvgl.h>
 #include <driver/i2c_master.h>
 #include <string_view>
+#include <vector>
 
 namespace hal_bridge {
 
@@ -62,6 +63,13 @@ void board_set_backlight_brightness(uint8_t brightness, bool permanent = false);
 uint8_t board_get_backlight_brightness();
 void board_set_speaker_volume(uint8_t volume, bool permanent = false);
 uint8_t board_get_speaker_volume();
+
+// Writes PCM samples directly to the board's audio output, bypassing
+// AudioService's queue/decoder. Caller is responsible for matching
+// AUDIO_OUTPUT_SAMPLE_RATE (see config.h) and for not calling this
+// concurrently with AudioService's own playback (e.g. while the AI is
+// speaking) -- the codec is not synchronized between the two paths.
+void board_output_pcm(std::vector<int16_t>& pcm);
 
 void app_play_sound(const std::string_view& sound);
 

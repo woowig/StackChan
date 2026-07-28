@@ -691,6 +691,19 @@ uint8_t hal_bridge::board_get_speaker_volume()
     return volume;
 }
 
+void hal_bridge::board_output_pcm(std::vector<int16_t>& pcm)
+{
+    auto& board      = Board::GetInstance();
+    auto audio_codec = board.GetAudioCodec();
+    if (!audio_codec) {
+        return;
+    }
+    if (!audio_codec->output_enabled()) {
+        audio_codec->EnableOutput(true);
+    }
+    audio_codec->OutputData(pcm);
+}
+
 void hal_bridge::toggle_xiaozhi_chat_state()
 {
     auto& app = Application::GetInstance();

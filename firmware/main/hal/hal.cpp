@@ -7,6 +7,7 @@
 #include <memory>
 #include <mooncake_log.h>
 #include <nvs_flash.h>
+#include <esp_timer.h>
 
 static std::unique_ptr<Hal> _hal_instance;
 static const std::string_view _tag = "HAL";
@@ -210,6 +211,15 @@ void Hal::startXiaozhi()
             avatar.addDecorator(std::make_unique<view::ReminderView>(lv_screen_active(), msg));
         }
         hal_bridge::app_play_sound(OGG_NEW_NOTIFICATION);
+        // Speak the reading aloud too, but only if nothing else is using the
+        // speaker right now -- this runs from a background timer and could
+        // otherwise land in the middle of a live conversation.
+        if (hal_bridge::is_xiaozhi_idle()) {
+            char koe[128];
+            snprintf(koe, sizeof(koe),
+                     "nisankatansono-dowa/<NUMK VAL=%u COUNTER=pi-pi-emu>desu./kankisitekuda'sai.", ppm);
+            GetHAL().speakSymbols(koe);
+        }
     });
 
     // Setup WBGT heat-stress alert handler
@@ -225,6 +235,12 @@ void Hal::startXiaozhi()
             avatar.addDecorator(std::make_unique<view::ReminderView>(lv_screen_active(), msg));
         }
         hal_bridge::app_play_sound(OGG_NEW_NOTIFICATION);
+        if (hal_bridge::is_xiaozhi_idle()) {
+            char koe[128];
+            snprintf(koe, sizeof(koe),
+                     "atsusashisu-wa/<NUMK VAL=%.1f COUNTER=do>desu./suibunhokyu-sitekuda'sai.", wbgt_celsius);
+            GetHAL().speakSymbols(koe);
+        }
     });
 
     // Start stackchan update task
