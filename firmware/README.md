@@ -1,56 +1,56 @@
 
-## Differences from upstream
+## upstreamとの差分
 
-This fork tracks [m5stack/StackChan](https://github.com/m5stack/StackChan) (`upstream/main`) and currently diverges from it at commit `b72b3ed` with the following changes:
+このフォークは [m5stack/StackChan](https://github.com/m5stack/StackChan)（`upstream/main`）を追従しており、現時点ではコミット `b72b3ed` から以下のように差分があります：
 
-### Automatic OTA upgrade disabled
+### 自動OTAアップデートの無効化
 
-`CONFIG_OTA_URL` (`main/Kconfig.projbuild`) still points at the upstream xiaozhi-esp32 cloud OTA server, which does not serve StackChan-compatible firmware images. On boot, `Application::CheckNewVersion()` used to compare the local version against whatever that server reports and silently flash the result if it looked newer, so devices could end up running unrelated/incompatible firmware. That auto-upgrade step is now skipped (see `patches/xiaozhi-esp32.patch`); the underlying version/activation check itself still runs, since it's also how mqtt/websocket config is fetched.
+`CONFIG_OTA_URL`（`main/Kconfig.projbuild`）は、upstreamのxiaozhi-esp32用クラウドOTAサーバーを指したままになっていますが、このサーバーはStackChan向けのファームウェアイメージを配信していません。以前は起動時に`Application::CheckNewVersion()`がローカルのバージョンとサーバーが返すバージョンを比較し、新しそうであれば無条件に書き換えていたため、無関係／非互換なファームウェアが焼かれてしまう恐れがありました。この自動アップグレード処理は現在スキップされています（`patches/xiaozhi-esp32.patch`参照）。ただし、バージョン・アクティベーションの確認処理自体はmqtt/websocketの設定取得にも使われているため、そのまま動作しています。
 
-### CO2 sensor support (M5Stack CO2L / Sensirion SCD41)
+### CO2センサー対応（M5Stack CO2L / Sensirion SCD41）
 
-Adds voice-assistant support for the [M5Stack CO2L unit](https://docs.m5stack.com/en/unit/CO2L), wired to Grove **PORT.A** (SDA=G2, SCL=G1):
+[M5Stack CO2Lユニット](https://docs.m5stack.com/en/unit/CO2L)（Grove **PORT.A**、SDA=G2, SCL=G1に接続）による音声アシスタント対応を追加：
 
-- `main/hal/drivers/scd41/` — minimal SCD41 I2C driver (low-power single-shot measurement, CRC8-verified)
-- `main/hal/hal_co2.cpp` — HAL wrapper; a measurement is triggered on demand (single shot, ~5s) rather than polled continuously, to save power on battery. It also runs a background task that takes a reading every 10 minutes and, if CO2 is at or above 1000ppm (Japan's Building Sanitation Law ventilation guidance), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after the level drops back down. Alerts are suppressed during quiet hours (23:00-07:00 local time, see `Hal::isQuietHours()` in `main/hal/hal_rtc.cpp`)
-- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_co2` MCP tool so the assistant can answer questions about CO2 concentration, temperature and humidity
-- `main/hal/board/stackchan.cc` — adds a second, external I2C bus for Grove PORT.A, separate from the internal I2C bus used for the PMIC/touch/etc.
+- `main/hal/drivers/scd41/` — 最小限のSCD41用I2Cドライバ（低消費電力のシングルショット計測、CRC8検証あり）
+- `main/hal/hal_co2.cpp` — HALラッパー。バッテリー消費を抑えるため、常時ポーリングではなくオンデマンドで計測（シングルショット、約5秒）を実行します。また10分ごとに計測を行うバックグラウンドタスクも動作し、CO2濃度が1000ppm以上（日本の建築物衛生法における換気基準）になった場合、画面上にアラートを表示し通知音を鳴らします。これは閾値を超えた瞬間に一度だけ発火し、濃度が下がるまで再アームされません。なお、クワイエットアワー（23:00〜07:00、`main/hal/hal_rtc.cpp`の`Hal::isQuietHours()`参照）中はアラートを抑制します
+- `main/hal/hal_mcp.cpp` — `self.sensor.get_co2`というMCPツールを公開し、アシスタントがCO2濃度・気温・湿度についての質問に答えられるようにします
+- `main/hal/board/stackchan.cc` — Grove PORT.A用に、PMICやタッチセンサーなどが使う内部I2Cバスとは別の、外部I2Cバスを追加
 
-Note: this repurposes GPIO2, which upstream also wires up (unused on this hardware) as a laser-pointer output in `Hal::setLaserEnabled()` (`main/hal/hal_espnow.cpp`). The two features cannot be used at the same time.
+注記: この機能はGPIO2を再利用しています。GPIO2はupstreamでもレーザーポインター出力として`Hal::setLaserEnabled()`（`main/hal/hal_espnow.cpp`）に配線されていますが、この機体のハードウェア上では未使用です。この2つの機能は同時には使用できません。
 
-### Environment sensor support (M5Stack ENV Pro Unit / Bosch BME688)
+### 環境センサー対応（M5Stack ENV Pro Unit / Bosch BME688）
 
-Adds voice-assistant support for the [M5Stack ENV Pro Unit](https://docs.m5stack.com/en/unit/ENV%20Pro%20Unit), on Grove **PORT.A**:
+[M5Stack ENV Pro Unit](https://docs.m5stack.com/en/unit/ENV%20Pro%20Unit)（Grove **PORT.A**）による音声アシスタント対応を追加：
 
-- `main/hal/drivers/bme688/BME68x_SensorAPI/` — Bosch's official BME68x sensor API (vendored, BSD-3-Clause), same approach as the BMI270 IMU driver
-- `main/hal/drivers/bme688/` — thin I2C wrapper around the sensor API, forced-mode (on-demand) temperature/pressure/humidity/gas-resistance readout
-- `main/hal/hal_env.cpp` — HAL wrapper; triggers a forced-mode measurement on demand, plus a rough "air quality score" (0-100%, higher is better) computed from humidity and the sensor's raw gas resistance against a self-adjusting baseline, and an estimated indoor WBGT heatstroke-risk index
-- `main/hal/hal_mcp.cpp` — exposes a `self.sensor.get_environment` MCP tool so the assistant can answer questions about temperature, barometric pressure, humidity, air quality, and heatstroke risk
+- `main/hal/drivers/bme688/BME68x_SensorAPI/` — Bosch公式のBME68xセンサーAPI（vendored、BSD-3-Clause）。BMI270用IMUドライバと同じ方針で取り込んでいます
+- `main/hal/drivers/bme688/` — センサーAPIの薄いI2Cラッパー。フォーストモード（オンデマンド）で気温・気圧・湿度・ガス抵抗値を取得します
+- `main/hal/hal_env.cpp` — HALラッパー。オンデマンドでフォーストモード計測を行うほか、湿度とセンサーの生のガス抵抗値を自己調整型のベースラインと比較して算出する簡易的な「空気質スコア」（0〜100%、高いほど良好）、および屋内WBGT熱中症リスク指数の推定値を計算します
+- `main/hal/hal_mcp.cpp` — `self.sensor.get_environment`というMCPツールを公開し、アシスタントが気温・気圧・湿度・空気質・熱中症リスクについての質問に答えられるようにします
 
-Note: this does **not** use Bosch's BSEC library for a calibrated IAQ index — BSEC is closed-source and its license restricts use to business users and prohibits redistributing the compiled library, which is incompatible with a public hobby-project repo. The air quality score is a simpler community-style heuristic instead: it starts from the first reading as a baseline and self-calibrates over subsequent queries (resets on reboot), so it's a relative/approximate indicator, not a certified measurement.
+注記: この実装では、較正済みのIAQ指数を得るためのBosch製BSECライブラリは**使用していません** — BSECはクローズドソースであり、そのライセンスは法人利用に限定され、コンパイル済みライブラリの再配布も禁止されているため、公開のホビープロジェクトのリポジトリとは相容れません。代わりに、よりシンプルなコミュニティ流のヒューリスティックで空気質スコアを算出しています。最初の計測値をベースラインとして、以降の問い合わせのたびに自己較正します（再起動でリセット）。そのため、これは認証された測定値ではなく、あくまで相対的・近似的な指標です。
 
-The gas heater (and with it, the air quality score) is currently **disabled** to save power on battery — it's the dominant power draw of a BME688 measurement (300C hotplate) and is otherwise only used for that heuristic. Temperature/pressure/humidity/WBGT are unaffected. With the heater disabled, `gas_valid` is always false and `air_quality_percent` is always omitted from the tool's response. Re-enable it in `main/hal/drivers/bme688/bme688.cpp` (`begin()`, `heatr_conf.enable`) if desired.
+ガスヒーター（およびそれに依存する空気質スコア）は、バッテリーでの消費電力を抑えるため現在**無効化**されています。BME688計測の中でガスヒーター（300℃のホットプレート）が消費電力の大部分を占め、他にはこのヒューリスティックにしか使われていないためです。気温・気圧・湿度・WBGTには影響しません。ヒーターを無効化した状態では、`gas_valid`は常にfalseとなり、`air_quality_percent`はツールのレスポンスから常に省略されます。必要であれば`main/hal/drivers/bme688/bme688.cpp`（`begin()`内の`heatr_conf.enable`）で再度有効化できます。
 
-The WBGT (Wet-Bulb Globe Temperature, 暑さ指数) estimate follows Japan's Ministry of the Environment indoor formula, `WBGT = 0.7 * wet-bulb temp + 0.3 * globe temp` ([wbgt.env.go.jp](https://www.wbgt.env.go.jp/)), with wet-bulb temperature approximated from temperature/humidity via Stull's (2011) empirical formula and globe temperature approximated by air temperature (no physical black-globe sensor). The reported `wbgt_risk_level` (caution/warning/severe warning/danger) uses the Ministry's official thresholds (25/28/31°C).
+WBGT（暑さ指数、Wet-Bulb Globe Temperature）の推定値は、日本の環境省が定める屋内用の計算式 `WBGT = 0.7 × 湿球温度 + 0.3 × 黒球温度`（[wbgt.env.go.jp](https://www.wbgt.env.go.jp/)）に基づいています。湿球温度は気温・湿度からStull（2011年）の経験式で近似し、黒球温度は（物理的な黒球センサーが無いため）気温で近似しています。レポートされる`wbgt_risk_level`（注意／警戒／厳重警戒／危険）は環境省の公式な閾値（25/28/31°C）を使用しています。
 
-`hal_env.cpp` also runs a background task that takes a reading every 10 minutes and, if WBGT is at or above 28°C (the Ministry's "severe warning" level), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after it drops back down, same as the CO2 ventilation alert above (and likewise suppressed during quiet hours).
+`hal_env.cpp`も同様に10分ごとに計測を行うバックグラウンドタスクを持ち、WBGTが28℃以上（環境省の「厳重警戒」レベル）になった場合に画面上にアラートを表示し通知音を鳴らします。上記のCO2換気アラートと同様、閾値超過時に一度だけ発火して、下がるまで再アームされません（同様にクワイエットアワー中は抑制されます）。
 
-### Idle screen dimming / quiet-hours screen-off
+### 待機時の画面減光／クワイエットアワー中の消灯
 
-Adds automatic backlight dimming to the AI-agent avatar screen, to save power and cut down on light/distraction when nobody's interacting with it:
+誰も操作していないときの省電力・光や気配の抑制のため、AIエージェントのアバター画面を自動的に減光する機能を追加：
 
-- `main/hal/board/stackchan_display.cc` (`StackChanAvatarDisplay::UpdateStatusBar`/`SetStatus`) — after 10 seconds of being idle (not listening or speaking), the backlight drops to 10% brightness; during quiet hours (23:00-07:00 local time, the same window `Hal::isQuietHours()` uses for the CO2/WBGT alerts above) it goes fully off instead. Brightness is restored automatically the moment a conversation starts again (wake word, tap on the avatar, etc).
-- `main/hal/board/stackchan.cc` (`CustomBacklight::SetBrightnessImpl`) — fixes a pre-existing bug where every brightness change drove the PMIC over I2C with dozens of redundant writes spread across up to ~450ms (the base `Backlight` class's software fade steps its internal brightness by 1 every 5ms, but this board's `SetBrightnessImpl` ignored that stepped value and re-wrote the final target on every tick instead of once). Since that internal I2C bus is shared with the audio codec, touch controller and IMU, the redundant writes could stall audio playback and avatar animation whenever brightness changed during a live conversation. Brightness is now applied in a single write and the fade timer stopped immediately — matching the PMIC hardware anyway, which has no native fade, just a coarse 8-level register.
+- `main/hal/board/stackchan_display.cc`（`StackChanAvatarDisplay::UpdateStatusBar`/`SetStatus`）— 待機状態（聞き取り・発話のどちらでもない状態）が10秒続くと、バックライトが明るさ10%まで落ちます。クワイエットアワー中（23:00〜07:00、上記CO2/WBGTアラートと同じ`Hal::isQuietHours()`の時間帯）は、10%ではなく完全に消灯します。会話が再開（ウェイクワード、アバターへのタップなど）した瞬間に自動で元の明るさへ復帰します。
+- `main/hal/board/stackchan.cc`（`CustomBacklight::SetBrightnessImpl`）— 明るさを変更するたびにPMICへのI2C書き込みが最大450ms程度にわたって何十回も無駄に発生していた既存のバグを修正しました（ベースとなる`Backlight`クラスのソフトウェアフェード処理は、内部の明るさ値を5msごとに1ずつ変化させますが、この機体の`SetBrightnessImpl`はその段階的な値を無視して、毎回最終的な目標値をそのまま書き込み直していました）。この内部I2Cバスはオーディオコーデックやタッチセンサー、IMUと共有されているため、会話中に明るさが変化すると、この無駄な書き込みによって音声再生やアバターのアニメーションが止まってしまうことがありました。現在は明るさを1回の書き込みで即座に適用し、フェード用タイマーも直後に止めるようにしています——そもそもこのPMICのハードウェア自体、滑らかなフェードには対応しておらず、粗い8段階のレジスタ値があるだけです。
 
-### Spoken CO2/WBGT alerts (AquesTalk ESP32)
+### CO2/WBGTアラートの音声読み上げ（AquesTalk ESP32）
 
-Adds actual speech to the CO2 ventilation and WBGT heat-stress background alerts above (previously just an on-screen bubble + notification ding):
+上記のCO2換気アラート・WBGT熱中症アラートに、実際の音声読み上げを追加しました（これまでは画面上の吹き出し表示＋通知音のみでした）：
 
-- `main/hal/hal_tts.cpp` — thin wrapper around AquesTalk ESP32's rule-synthesis engine (`Hal::speakSymbols()`): feeds an AquesTalk phonetic symbol string through `CAqTkPicoF_SetKoe`/`SyntheFrame`, upsamples the 8kHz output 3x (`AqResample_Conv`) to match this board's 24kHz audio pipeline, and writes it straight to the avatar's own speaker.
-- `main/hal/board/hal_bridge.h`/`stackchan.cc` (`board_output_pcm`) — writes a raw PCM buffer directly to `Board::GetAudioCodec()`, bypassing `AudioService`'s decode/playback queue (which only speaks pre-encoded OGG assets). Not synchronized with the AI's own voice output, so callers must check `hal_bridge::is_xiaozhi_idle()` first — the alert handlers in `hal.cpp` skip the spoken part (keeping the visual+ding) if a conversation is in progress, rather than risk corrupting either audio stream.
-- `main/hal/hal.cpp` (`onCo2VentilationAlert`/`onWbgtAlert` handlers) — speaks e.g. "二酸化炭素濃度は812ピーピーエムです。換気してください。" using AquesTalk's `<NUMK VAL=... COUNTER=...>` digit-reading tag, which renders arbitrary numbers with correct Japanese sound changes (rendaku, gemination, etc.) entirely offline and without needing AquesTalk's ~2MB kanji dictionary — the fixed part of each phrase is a hand-written phonetic template, only the number is generated at runtime.
+- `main/hal/hal_tts.cpp` — AquesTalk ESP32の規則音声合成エンジンをラップした薄いレイヤー（`Hal::speakSymbols()`）。AquesTalkの音声記号列を`CAqTkPicoF_SetKoe`/`SyntheFrame`に渡し、8kHzの出力をこの機体のオーディオパイプライン（24kHz）に合わせて3倍アップサンプリング（`AqResample_Conv`）した上で、アバター自身のスピーカーへ直接書き込みます。
+- `main/hal/board/hal_bridge.h`/`stackchan.cc`（`board_output_pcm`）— 生のPCMバッファを`Board::GetAudioCodec()`へ直接書き込み、`AudioService`のデコード・再生キュー（事前エンコード済みのOGGアセットしか再生できません）を経由しません。AIの音声出力とは同期していないため、呼び出し側は事前に`hal_bridge::is_xiaozhi_idle()`を確認する必要があります。`hal.cpp`内のアラートハンドラーでは、会話中はどちらのオーディオも壊さないよう読み上げ部分をスキップします（画面表示と通知音はそのまま維持されます）。
+- `main/hal/hal.cpp`（`onCo2VentilationAlert`/`onWbgtAlert`ハンドラー）— 「二酸化炭素濃度は812ピーピーエムです。換気してください。」のように読み上げます。AquesTalkの`<NUMK VAL=... COUNTER=...>`という桁読みタグを使うことで、任意の数値を正しい日本語の音変化（連濁・促音化など）付きで、完全にオフラインかつAquesTalkの約2MBある漢字辞書を使わずに読み上げられます。各フレーズの定型部分は手書きの音声記号列で、数値部分だけを実行時に生成しています。
 
-Note: AquesTalk ESP32 is closed-source and its evaluation build has a fixed limitation (the な/ま row is pronounced "ヌ") until a paid license key is set — same category of restriction as the BSEC note above, so **the SDK itself is not committed to this repo** (`firmware/components/` is already gitignored). See "AquesTalk ESP32 SDK" under Build below for how to obtain and place it before building this fork.
+注記: AquesTalk ESP32はクローズドソースであり、評価版には有償のライセンスキーを設定するまで固定の制約があります（な行・ま行がすべて「ヌ」と発声されます）。これは上記のBSECの注記と同種のライセンス制約であるため、**このSDK自体はこのリポジトリにはコミットしていません**（`firmware/components/`は既にgitignore対象です）。入手・配置方法は、下記Buildセクションの「AquesTalk ESP32 SDK」を参照してください。
 
 ## Build
 
