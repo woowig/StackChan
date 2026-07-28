@@ -53,9 +53,17 @@ bool Hal::speakSymbols(std::string_view koe)
 
     AqResample_Reset();
 
+    // Flush in small chunks rather than writing the whole utterance in one
+    // go. CoreS3AudioCodec::Write() self-heals a single mid-write I2S hiccup
+    // (this duplex codec's shared input/output channel occasionally needs a
+    // reopen), but only once per call -- a multi-second single write could
+    // hit the same hiccup twice and lose the rest of the audio. Smaller
+    // chunks mean each one gets its own retry chance.
+    constexpr size_t kFlushChunkSamples = 4800;  // ~0.2s at 24kHz
     std::vector<int16_t> pcm;
-    pcm.reserve(kAqSampleRate * 3);  // ~1s headroom at 24kHz, grows as needed
+    pcm.reserve(kFlushChunkSamples);
 
+    size_t total_samples = 0;
     int16_t frame[kLenFrame];
     int16_t resampled[3];
     while (true) {
@@ -64,6 +72,11 @@ bool Hal::speakSymbols(std::string_view koe)
         for (uint16_t i = 0; i < len; i++) {
             AqResample_Conv(frame[i], resampled);
             pcm.insert(pcm.end(), resampled, resampled + 3);
+        }
+        if (pcm.size() >= kFlushChunkSamples) {
+            total_samples += pcm.size();
+            hal_bridge::board_output_pcm(pcm);
+            pcm.clear();
         }
         if (status != 0) {
             // 1 == end of data, anything else == error; either way, nothing more to render
@@ -74,8 +87,11 @@ bool Hal::speakSymbols(std::string_view koe)
             break;
         }
     }
+    if (!pcm.empty()) {
+        total_samples += pcm.size();
+        hal_bridge::board_output_pcm(pcm);
+    }
 
-    mclog::tagInfo(_tag, "speaking {} samples ({:.1f}s)", pcm.size(), pcm.size() / (kAqSampleRate * 3.0f));
-    hal_bridge::board_output_pcm(pcm);
+    mclog::tagInfo(_tag, "spoke {} samples ({:.1f}s)", total_samples, total_samples / (kAqSampleRate * 3.0f));
     return true;
 }

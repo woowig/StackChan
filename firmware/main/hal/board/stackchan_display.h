@@ -57,4 +57,9 @@ public:
     void LvglLock();
     void LvglUnlock();
     lv_disp_t* GetLvglDisplay();
+
+    // Restores brightness if the screen is currently dimmed/off from being
+    // idle, and resets the idle timer so it can dim again later (e.g. for
+    // an alert popup that should be visible even during quiet hours).
+    void WakeBrightness();
 };

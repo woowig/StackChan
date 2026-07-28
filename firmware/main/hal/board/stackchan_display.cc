@@ -285,6 +285,15 @@ void StackChanAvatarDisplay::SetupUI()
     ESP_LOGI(TAG, "Avatar created and started");
 }
 
+void StackChanAvatarDisplay::WakeBrightness()
+{
+    idle_ticks_ = 0;
+    if (is_dimmed_) {
+        GetHAL().setBackLightBrightness(saved_brightness_, false);
+        is_dimmed_ = false;
+    }
+}
+
 void StackChanAvatarDisplay::LvglLock()
 {
     if (!Lock(30000)) {

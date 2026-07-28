@@ -205,6 +205,7 @@ void Hal::startXiaozhi()
     onCo2VentilationAlert.connect([](uint16_t ppm) {
         std::string msg = "High CO2: " + std::to_string(ppm) + " ppm, consider ventilating";
         mclog::tagInfo(_tag, "co2 ventilation alert: {}", msg);
+        hal_bridge::board_wake_screen_brightness();
         {
             LvglLockGuard lock;
             auto& avatar = GetStackChan().avatar();
@@ -229,6 +230,7 @@ void Hal::startXiaozhi()
         snprintf(wbgt_buf, sizeof(wbgt_buf), "%.1f", wbgt_celsius);
         std::string msg = std::string("High heat stress: WBGT ") + wbgt_buf + "C, stay hydrated";
         mclog::tagInfo(_tag, "wbgt alert: {}", msg);
+        hal_bridge::board_wake_screen_brightness();
         {
             LvglLockGuard lock;
             auto& avatar = GetStackChan().avatar();

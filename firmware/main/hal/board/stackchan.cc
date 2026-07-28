@@ -704,6 +704,15 @@ void hal_bridge::board_output_pcm(std::vector<int16_t>& pcm)
     audio_codec->OutputData(pcm);
 }
 
+void hal_bridge::board_wake_screen_brightness()
+{
+    auto& board   = Board::GetInstance();
+    auto* display = static_cast<StackChanAvatarDisplay*>(board.GetDisplay());
+    if (display) {
+        display->WakeBrightness();
+    }
+}
+
 void hal_bridge::toggle_xiaozhi_chat_state()
 {
     auto& app = Application::GetInstance();

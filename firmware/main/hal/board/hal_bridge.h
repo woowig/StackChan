@@ -71,6 +71,10 @@ uint8_t board_get_speaker_volume();
 // speaking) -- the codec is not synchronized between the two paths.
 void board_output_pcm(std::vector<int16_t>& pcm);
 
+// Restores screen brightness if it's currently dimmed/off from being idle
+// (e.g. so an alert popup is visible even during quiet hours).
+void board_wake_screen_brightness();
+
 void app_play_sound(const std::string_view& sound);
 
 }  // namespace hal_bridge

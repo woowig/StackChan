@@ -239,8 +239,30 @@ int CoreS3AudioCodec::Read(int16_t* dest, int samples) {
 }
 
 int CoreS3AudioCodec::Write(const int16_t* data, int samples) {
-    if (output_enabled_) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
+    if (!output_enabled_) {
+        return samples;
+    }
+
+    esp_err_t err = static_cast<esp_err_t>(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
+    if (err != ESP_OK) {
+        // On this duplex codec, the underlying I2S channel can get disabled out
+        // from under us (observed when writing PCM outside of AudioService's own
+        // playback task, e.g. Hal::speakSymbols) without our output_enabled_ flag
+        // being touched. Recover by reopening the device once and retrying,
+        // instead of silently dropping audio for the rest of the buffer.
+        ESP_LOGW(TAG, "Output write failed (%s), reopening device and retrying", esp_err_to_name(err));
+        esp_codec_dev_close(output_dev_);
+        esp_codec_dev_sample_info_t fs = {
+            .bits_per_sample = 16,
+            .channel         = 1,
+            .channel_mask    = 0,
+            .sample_rate     = (uint32_t)output_sample_rate_,
+            .mclk_multiple   = 0,
+        };
+        if (esp_codec_dev_open(output_dev_, &fs) == ESP_OK) {
+            esp_codec_dev_set_out_vol(output_dev_, output_volume_);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_codec_dev_write(output_dev_, (void*)data, samples * sizeof(int16_t)));
+        }
     }
     return samples;
 }
