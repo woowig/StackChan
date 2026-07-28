@@ -443,8 +443,24 @@ void StackChanAvatarDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image)
     ESP_ERROR_CHECK(esp_timer_start_once(preview_timer_, 6000 * 1000));
 }
 
+namespace {
+constexpr int kIdleDimDelaySeconds  = 10;
+constexpr uint8_t kIdleDimBrightness = 10;
+}  // namespace
+
 void StackChanAvatarDisplay::UpdateStatusBar(bool update_all)
 {
+    if (!is_idle_ || is_dimmed_) {
+        return;
+    }
+
+    idle_ticks_++;
+    if (idle_ticks_ >= kIdleDimDelaySeconds) {
+        saved_brightness_    = GetHAL().getBackLightBrightness();
+        uint8_t target_level = GetHAL().isQuietHours() ? 0 : kIdleDimBrightness;
+        GetHAL().setBackLightBrightness(target_level, false);
+        is_dimmed_ = true;
+    }
 }
 
 void StackChanAvatarDisplay::SetTheme(Theme* theme)
@@ -518,6 +534,9 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
 
         is_idle = true;
 
+        is_idle_    = true;
+        idle_ticks_ = 0;
+
         GetHAL().setRgbColor(0, 0, 0, 0);
         GetHAL().refreshRgb();
 
@@ -560,6 +579,14 @@ void StackChanAvatarDisplay::SetStatus(const char* status)
         // }
 
         _is_xiaozhi_idle = false;
+        is_idle_         = false;
+        idle_ticks_      = 0;
+
+        // Restore brightness if it was dimmed while idle
+        if (is_dimmed_) {
+            GetHAL().setBackLightBrightness(saved_brightness_, false);
+            is_dimmed_ = false;
+        }
     }
 
     // Clear sleep state

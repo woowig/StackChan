@@ -21,6 +21,11 @@ private:
     bool is_sleeping_                   = false;
     uint8_t idle_motion_level_          = 2;
 
+    bool is_idle_             = false;
+    int idle_ticks_           = 0;
+    bool is_dimmed_           = false;
+    uint8_t saved_brightness_ = 100;
+
     lv_obj_t* preview_image_                         = nullptr;
     esp_timer_handle_t preview_timer_                = nullptr;
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;

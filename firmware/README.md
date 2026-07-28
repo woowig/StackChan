@@ -35,6 +35,13 @@ The WBGT (Wet-Bulb Globe Temperature, 暑さ指数) estimate follows Japan's Min
 
 `hal_env.cpp` also runs a background task that takes a reading every 10 minutes and, if WBGT is at or above 28°C (the Ministry's "severe warning" level), shows an on-screen alert and plays a notification sound — once per crossing, re-arming only after it drops back down, same as the CO2 ventilation alert above (and likewise suppressed during quiet hours).
 
+### Idle screen dimming / quiet-hours screen-off
+
+Adds automatic backlight dimming to the AI-agent avatar screen, to save power and cut down on light/distraction when nobody's interacting with it:
+
+- `main/hal/board/stackchan_display.cc` (`StackChanAvatarDisplay::UpdateStatusBar`/`SetStatus`) — after 10 seconds of being idle (not listening or speaking), the backlight drops to 10% brightness; during quiet hours (23:00-07:00 local time, the same window `Hal::isQuietHours()` uses for the CO2/WBGT alerts above) it goes fully off instead. Brightness is restored automatically the moment a conversation starts again (wake word, tap on the avatar, etc).
+- `main/hal/board/stackchan.cc` (`CustomBacklight::SetBrightnessImpl`) — fixes a pre-existing bug where every brightness change drove the PMIC over I2C with dozens of redundant writes spread across up to ~450ms (the base `Backlight` class's software fade steps its internal brightness by 1 every 5ms, but this board's `SetBrightnessImpl` ignored that stepped value and re-wrote the final target on every tick instead of once). Since that internal I2C bus is shared with the audio codec, touch controller and IMU, the redundant writes could stall audio playback and avatar animation whenever brightness changed during a live conversation. Brightness is now applied in a single write and the fade timer stopped immediately — matching the PMIC hardware anyway, which has no native fade, just a coarse 8-level register.
+
 ## Build
 
 ### Fetch Dependencies

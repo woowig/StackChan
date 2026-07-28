@@ -134,8 +134,17 @@ public:
 
     void SetBrightnessImpl(uint8_t brightness) override
     {
+        // The PMIC applies brightness in a single register write, so there's no
+        // hardware benefit to the base class's stepped 5ms fade -- and letting it
+        // run to completion means dozens of redundant I2C writes on the shared bus
+        // (also used by the audio codec/touch/IMU), which caused audible/visual
+        // stutter when brightness changed during a live conversation. Apply the
+        // final target immediately and stop the transition timer after this tick.
         pmic_->SetBrightness(target_brightness_);
         brightness_ = target_brightness_;
+        if (transition_timer_ != nullptr) {
+            esp_timer_stop(transition_timer_);
+        }
     }
 
 private:
